@@ -1,0 +1,31 @@
+{
+  "name": "youtube-exporter",
+  "version": "0.0.1",
+  "description": "Prometheus exporter for YouTube",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stingalleman/youtube-exporter.git"
+  },
+  "keywords": [
+    "prometheus",
+    "exporter",
+    "youtube",
+    "grafana",
+    "metrics"
+  ],
+  "author": "Sting Alleman",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/stingalleman/youtube-exporter/issues"
+  },
+  "homepage": "https://github.com/stingalleman/youtube-exporter#readme",
+  "devDependencies": {
+    "eslint": "^7.0.0",
+    "eslint-plugin-prettier": "^3.1.3",
+    "prettier": "^2.0.5"
+  }
+}
