@@ -18,9 +18,19 @@ const refresh = 15;
  * define metrics
  */
 
-const streamStatusGauge = new prom.Gauge({
+const yt_streamStatus_counter = new prom.Gauge({
 	name: "yt_streamStatus_counter",
 	help: "Stream Status",
+});
+
+const yt_healthStatus_counter = new prom.Gauge({
+	name: "yt_healthStatus_counter",
+	help: "Stream Status",
+});
+
+const yt_concurrentViewers_counter = new prom.Gauge({
+	name: "yt_concurrentViewers_counter",
+	help: "Concurrent Viewers",
 });
 
 /**
@@ -144,24 +154,41 @@ async function execute(auth) {
 		auth: auth,
 	});
 	const livestreamData = await service.liveStreams.list({
-		part: ["snippet,cdn,contentDetails,status"],
+		part: ["snippet,contentDetails,status"],
 		auth: auth,
 		id: broadcastData.data.items[0].contentDetails.boundStreamId,
 	});
-	// streamStatusGauge
+	const videoData = await service.videos.list({
+		part: ["liveStreamingDetails, id"],
+		auth: auth,
+		id: broadcastData.data.items[0].id,
+	});
+
+	yt_concurrentViewers_counter.set(parseInt(videoData.data.items[0].liveStreamingDetails.concurrentViewers));
+
+	// yt_streamStatus_counter
 	if (livestreamData.data.items[0].status.streamStatus == "inactive") {
-		streamStatusGauge.set(0);
+		yt_streamStatus_counter.set(0);
 	} else if (livestreamData.data.items[0].status.streamStatus == "error") {
-		streamStatusGauge.set(1);
+		yt_streamStatus_counter.set(1);
 	} else if (livestreamData.data.items[0].status.streamStatus == "created") {
-		streamStatusGauge.set(2);
+		yt_streamStatus_counter.set(2);
 	} else if (livestreamData.data.items[0].status.streamStatus == "ready") {
-		streamStatusGauge.set(3);
+		yt_streamStatus_counter.set(3);
 	} else if (livestreamData.data.items[0].status.streamStatus == "active") {
-		streamStatusGauge.set(4);
+		yt_streamStatus_counter.set(4);
 	}
 
-	// 
+	// yt_healthStatus_counter
+	if (livestreamData.data.items[0].status.healthStatus.status == "noData") {
+		yt_healthStatus_counter.set(0);
+	} else if (livestreamData.data.items[0].status.healthStatus.status == "bad") {
+		yt_healthStatus_counter.set(1);
+	} else if (livestreamData.data.items[0].status.healthStatus.status == "ok") {
+		yt_healthStatus_counter.set(2);
+	} else if (livestreamData.data.items[0].status.healthStatus.status == "good") {
+		yt_healthStatus_counter.set(3);
+	}
 }
 
 app.get("/auth*", function (req, res) {
