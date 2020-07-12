@@ -12,6 +12,6 @@
 |-------|-------------|
 | 0     | Inactive    |
 | 1     | Error       |
-| 3     | Created     |
-| 4     | Ready       |
-| 5     | Active      |
+| 2     | Created     |
+| 3     | Ready       |
+| 4     | Active      |
