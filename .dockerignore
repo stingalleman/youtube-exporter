@@ -1,0 +1,5 @@
+.eslint*
+.gitignore
+.prettier*
+LICENSE.md
+README.md

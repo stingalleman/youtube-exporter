@@ -1,5 +1,4 @@
 const fs = require("fs");
-const readline = require("readline");
 const { google } = require("googleapis");
 const express = require("express");
 const moment = require("moment");
@@ -34,16 +33,6 @@ const yt_concurrentViewers_counter = new prom.Gauge({
 });
 
 /**
- * define scopes
- */
-const SCOPES = [
-	"https://www.googleapis.com/auth/youtube.readonly",
-	"https://www.googleapis.com/auth/youtube.force-ssl",
-	"https://www.googleapis.com/auth/youtube.upload",
-	"https://www.googleapis.com/auth/youtube",
-];
-
-/**
  * token directories
  */
 const TOKEN_DIR = "./.credentials/";
@@ -74,9 +63,9 @@ setInterval(function () {
  * @param {function} callback The callback to call with the authorized client.
  */
 function authorize(credentials, callback) {
-	const clientSecret = credentials.googleAPI.client_secret;
-	const clientId = credentials.googleAPI.client_id;
-	const redirectUrl = credentials.googleAPI.redirect_uris[0];
+	const clientSecret = process.env.CLIENTSECRET;
+	const clientId = process.env.CLIENTID;
+	const redirectUrl = process.env.REDIRECTURL;
 	const oauth2Client = new OAuth2(clientId, clientSecret, redirectUrl);
 
 	// Check if we have previously stored a token.
@@ -101,24 +90,29 @@ function authorize(credentials, callback) {
 function getNewToken(oauth2Client, callback) {
 	const authUrl = oauth2Client.generateAuthUrl({
 		access_type: "offline",
-		scope: SCOPES,
+		scope: [
+			"https://www.googleapis.com/auth/youtube.readonly",
+			"https://www.googleapis.com/auth/youtube.force-ssl",
+			"https://www.googleapis.com/auth/youtube.upload",
+			"https://www.googleapis.com/auth/youtube",
+		],
 	});
-	console.log("Authorize this app by visiting this url: ", authUrl);
-	const rl = readline.createInterface({
-		input: process.stdin,
-		output: process.stdout,
-	});
-	rl.question("Enter the code from that page here: ", function (code) {
-		rl.close();
-		oauth2Client.getToken(code, function (err, token) {
-			if (err) {
-				console.log("Error while trying to retrieve access token", err);
-				return;
-			}
-			oauth2Client.credentials = token;
-			storeToken(token);
-			callback(oauth2Client);
-		});
+	console.log("Auth link: " + authUrl);
+	app.get("/auth*", function (req, res) {
+		try {
+			oauth2Client.getToken(req.query.code, function (err, token) {
+				if (err) {
+					console.log("Error while trying to retrieve access token", err);
+					return;
+				}
+				oauth2Client.credentials = token;
+				storeToken(token);
+				callback(oauth2Client);
+				res.send("Successfully authenticated!");
+			});
+		} catch (err) {
+			if (err) res.status(500).send(err);
+		}
 	});
 }
 
@@ -191,21 +185,13 @@ async function execute(auth) {
 	}
 }
 
-app.get("/auth*", function (req, res) {
-	try {
-		res.send(req.query.code);
-	} catch (err) {
-		if (err) console.log(err);
-	}
-});
-
 app.get("/metrics", async (req, res) => {
 	try {
 		res.set("Content-Type", register.contentType);
-		res.send(await register.metrics());
+		res.status(200).send(await register.metrics());
 	} catch (ex) {
 		res.status(500).end(ex);
 	}
 });
 
-app.listen("3000", () => console.log("listening on http://localhost:3000"));
+app.listen(9010, () => console.log("listening on http://localhost:9010"));
