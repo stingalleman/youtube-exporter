@@ -88,4 +88,6 @@ typings/
 .dynamodb/
 
 
+src/.credentials
 src/config.json
+src/result.json
