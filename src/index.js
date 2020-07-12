@@ -87,7 +87,7 @@ function authorize(callback) {
  */
 function getNewToken(oauth2Client, callback) {
 	const authUrl = oauth2Client.generateAuthUrl({
-		access_type: "offline",
+		access_type: "online",
 		scope: [
 			"https://www.googleapis.com/auth/youtube.readonly",
 			"https://www.googleapis.com/auth/youtube.force-ssl",
