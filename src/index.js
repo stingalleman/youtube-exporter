@@ -4,7 +4,7 @@ const express = require("express");
 const moment = require("moment");
 const OAuth2 = google.auth.OAuth2;
 
-moment.locale("nl");
+// moment.locale("nl");
 
 const app = express();
 
@@ -17,19 +17,24 @@ const refresh = 15;
  * define metrics
  */
 
-const yt_streamStatus_counter = new prom.Gauge({
-	name: "yt_streamStatus_counter",
+const yt_streamStatus = new prom.Gauge({
+	name: "yt_streamStatus",
 	help: "Stream Status",
 });
 
-const yt_healthStatus_counter = new prom.Gauge({
-	name: "yt_healthStatus_counter",
+const yt_healthStatus = new prom.Gauge({
+	name: "yt_healthStatus",
 	help: "Stream Status",
 });
 
-const yt_concurrentViewers_counter = new prom.Gauge({
-	name: "yt_concurrentViewers_counter",
+const yt_concurrentViewers = new prom.Gauge({
+	name: "yt_concurrentViewers",
 	help: "Concurrent Viewers",
+});
+
+const yt_uptime = new prom.Gauge({
+	name: "yt_uptime",
+	help: "Stream uptime",
 });
 
 /**
@@ -129,8 +134,6 @@ function storeToken(token) {
 }
 
 /**
- * Lists the names and IDs of up to 10 files.
- *
  * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
  */
 async function execute(auth) {
@@ -140,43 +143,61 @@ async function execute(auth) {
 		broadcastStatus: "active",
 		auth: auth,
 	});
-	const livestreamData = await service.liveStreams.list({
-		part: ["snippet,contentDetails,status"],
-		auth: auth,
-		id: broadcastData.data.items[0].contentDetails.boundStreamId,
-	});
-	const videoData = await service.videos.list({
-		part: ["liveStreamingDetails, id"],
-		auth: auth,
-		id: broadcastData.data.items[0].id,
-	});
 
-	yt_concurrentViewers_counter.set(parseInt(videoData.data.items[0].liveStreamingDetails.concurrentViewers));
+	// If stream
+	if (broadcastData.data.items[0].contentDetails.boundStreamId && broadcastData.data.items[0].id) {
+		const livestreamData = await service.liveStreams.list({
+			part: ["snippet,contentDetails,status"],
+			auth: auth,
+			id: broadcastData.data.items[0].contentDetails.boundStreamId,
+		});
+		const videoData = await service.videos.list({
+			part: ["liveStreamingDetails, id"],
+			auth: auth,
+			id: broadcastData.data.items[0].id,
+		});
 
-	// yt_streamStatus_counter
-	if (livestreamData.data.items[0].status.streamStatus == "inactive") {
-		yt_streamStatus_counter.set(0);
-	} else if (livestreamData.data.items[0].status.streamStatus == "error") {
-		yt_streamStatus_counter.set(1);
-	} else if (livestreamData.data.items[0].status.streamStatus == "created") {
-		yt_streamStatus_counter.set(2);
-	} else if (livestreamData.data.items[0].status.streamStatus == "ready") {
-		yt_streamStatus_counter.set(3);
-	} else if (livestreamData.data.items[0].status.streamStatus == "active") {
-		yt_streamStatus_counter.set(4);
-	}
+		// Metric yt_uptime
+		yt_uptime.set(moment().diff(videoData.data.items[0].liveStreamingDetails.actualStartTime, "seconds"));
 
-	// yt_healthStatus_counter
-	if (livestreamData.data.items[0].status.healthStatus.status == "noData") {
-		yt_healthStatus_counter.set(0);
-	} else if (livestreamData.data.items[0].status.healthStatus.status == "bad") {
-		yt_healthStatus_counter.set(1);
-	} else if (livestreamData.data.items[0].status.healthStatus.status == "ok") {
-		yt_healthStatus_counter.set(2);
-	} else if (livestreamData.data.items[0].status.healthStatus.status == "good") {
-		yt_healthStatus_counter.set(3);
+		// Metric yt_concurrentViewers
+		yt_concurrentViewers.set(parseInt(videoData.data.items[0].liveStreamingDetails.concurrentViewers));
+
+		// Metric yt_streamStatus
+		if (livestreamData.data.items[0].status.streamStatus == "inactive") {
+			yt_streamStatus.set(0);
+		} else if (livestreamData.data.items[0].status.streamStatus == "error") {
+			yt_streamStatus.set(1);
+		} else if (livestreamData.data.items[0].status.streamStatus == "created") {
+			yt_streamStatus.set(2);
+		} else if (livestreamData.data.items[0].status.streamStatus == "ready") {
+			yt_streamStatus.set(3);
+		} else if (livestreamData.data.items[0].status.streamStatus == "active") {
+			yt_streamStatus.set(4);
+		}
+
+		// Metric yt_healthStatus
+		if (livestreamData.data.items[0].status.healthStatus.status == "noData") {
+			yt_healthStatus.set(0);
+		} else if (livestreamData.data.items[0].status.healthStatus.status == "bad") {
+			yt_healthStatus.set(1);
+		} else if (livestreamData.data.items[0].status.healthStatus.status == "ok") {
+			yt_healthStatus.set(2);
+		} else if (livestreamData.data.items[0].status.healthStatus.status == "good") {
+			yt_healthStatus.set(3);
+		}
+	} else {
+		// no stream
+		yt_concurrentViewers.set(0);
+		yt_healthStatus.set(0);
+		yt_streamStatus.set(0);
 	}
 }
+
+app.get("/", (req, res) => {
+	// eslint-disable-next-line quotes
+	res.send('<a href="/metrics">Metrics</a>');
+});
 
 app.get("/metrics", async (req, res) => {
 	try {
@@ -187,4 +208,4 @@ app.get("/metrics", async (req, res) => {
 	}
 });
 
-app.listen(9010, () => console.log("listening on http://localhost:9010"));
+app.listen(9010, () => console.log("listening on http://localhost:9010/metrics"));
