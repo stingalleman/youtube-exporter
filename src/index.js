@@ -6,12 +6,31 @@ const OAuth2 = google.auth.OAuth2;
 
 const app = express();
 
+const prom = require("prom-client");
+const register = prom.register;
+
+/**
+ * define metrics
+ */
+
+const streamStatusGauge = new prom.Gauge({
+	name: "yt_streamStatus_counter",
+	help: "Stream Status",
+});
+
+/**
+ * define scopes
+ */
 const SCOPES = [
 	"https://www.googleapis.com/auth/youtube.readonly",
 	"https://www.googleapis.com/auth/youtube.force-ssl",
 	"https://www.googleapis.com/auth/youtube.upload",
 	"https://www.googleapis.com/auth/youtube",
 ];
+
+/**
+ * token directories
+ */
 const TOKEN_DIR = "./.credentials/";
 const TOKEN_PATH = TOKEN_DIR + "youtube-creds.json";
 
@@ -22,7 +41,7 @@ fs.readFile("config.json", function processClientSecrets(err, content) {
 		return;
 	}
 	// Authorize a client with the loaded credentials, then call the YouTube API.
-	authorize(JSON.parse(content), getChannel);
+	authorize(JSON.parse(content), execute);
 });
 
 /**
@@ -59,7 +78,7 @@ function authorize(credentials, callback) {
  */
 function getNewToken(oauth2Client, callback) {
 	const authUrl = oauth2Client.generateAuthUrl({
-		access_type: "offline",
+		access_type: "online",
 		scope: SCOPES,
 	});
 	console.log("Authorize this app by visiting this url: ", authUrl);
@@ -105,29 +124,40 @@ function storeToken(token) {
  *
  * @param {google.auth.OAuth2} auth An authorized OAuth2 client.
  */
-async function getChannel(auth) {
+async function execute(auth) {
 	const service = google.youtube("v3");
-	await service.liveBroadcasts
-		.list({
-			part: ["snippet,contentDetails,status"],
-			broadcastStatus: "active",
-			auth: auth,
-		})
-		.then(
-			function (response) {
-				console.log(JSON.stringify(response.data, null, " "));
-			},
-			function (err) {
-				console.error("Execute error", err);
-			}
-		);
+	const broadcastData = await service.liveBroadcasts.list({
+		part: ["snippet,contentDetails,status"],
+		broadcastStatus: "active",
+		auth: auth,
+	});
+	const livestreamData = await service.liveStreams.list({
+		part: ["snippet,cdn,contentDetails,status"],
+		auth: auth,
+		id: broadcastData.data.items[0].contentDetails.boundStreamId,
+	});
+	console.log(livestreamData.data.items[0].status.streamStatus);
+
+	if (livestreamData.data.items[0].status.streamStatus == "inactive") {
+		streamStatusGauge.set(0);
+	}
 }
 
-app.get("/*", function (req, res) {
+app.get("/auth/*", function (req, res) {
 	try {
 		res.send(req.query.code);
 	} catch (err) {
 		if (err) console.log(err);
 	}
 });
-app.listen("80", () => console.log("listening on http://localhost"));
+
+app.get("/metrics", async (req, res) => {
+	try {
+		res.set("Content-Type", register.contentType);
+		res.send(await register.metrics());
+	} catch (ex) {
+		res.status(500).end(ex);
+	}
+});
+
+app.listen("3000", () => console.log("listening on http://localhost:3000"));
