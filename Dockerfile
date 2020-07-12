@@ -1,4 +1,4 @@
-FROM node:latest
+FROM node:alpine
 
 ENV CLIENTSECRET unknown
 ENV CLIENTID unknown
