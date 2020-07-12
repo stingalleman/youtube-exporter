@@ -32,6 +32,7 @@
     "express": "^4.17.1",
     "google-auth-library": "^6.0.4",
     "googleapis": "^52.1.0",
+    "moment": "^2.27.0",
     "prom-client": "^12.0.0"
   }
 }

@@ -2,12 +2,17 @@ const fs = require("fs");
 const readline = require("readline");
 const { google } = require("googleapis");
 const express = require("express");
+const moment = require("moment");
 const OAuth2 = google.auth.OAuth2;
+
+moment.locale("nl");
 
 const app = express();
 
 const prom = require("prom-client");
 const register = prom.register;
+
+const refresh = 15;
 
 /**
  * define metrics
@@ -34,15 +39,22 @@ const SCOPES = [
 const TOKEN_DIR = "./.credentials/";
 const TOKEN_PATH = TOKEN_DIR + "youtube-creds.json";
 
-// Load client secrets from a local file.
-fs.readFile("config.json", function processClientSecrets(err, content) {
-	if (err) {
-		console.log("Error loading client secret file: " + err);
-		return;
-	}
-	// Authorize a client with the loaded credentials, then call the YouTube API.
-	authorize(JSON.parse(content), execute);
-});
+function init() {
+	// Load client secrets from a local file.
+	fs.readFile("config.json", function processClientSecrets(err, content) {
+		if (err) {
+			console.log("Error loading client secret file: " + err);
+			return;
+		}
+		// Authorize a client with the loaded credentials, then call the YouTube API.
+		authorize(JSON.parse(content), execute);
+	});
+}
+
+init();
+setInterval(function () {
+	init();
+}, refresh * 1000);
 
 /**
  * Create an OAuth2 client with the given credentials, and then execute the
@@ -78,7 +90,7 @@ function authorize(credentials, callback) {
  */
 function getNewToken(oauth2Client, callback) {
 	const authUrl = oauth2Client.generateAuthUrl({
-		access_type: "online",
+		access_type: "offline",
 		scope: SCOPES,
 	});
 	console.log("Authorize this app by visiting this url: ", authUrl);
@@ -136,14 +148,23 @@ async function execute(auth) {
 		auth: auth,
 		id: broadcastData.data.items[0].contentDetails.boundStreamId,
 	});
-	console.log(livestreamData.data.items[0].status.streamStatus);
-
+	// streamStatusGauge
 	if (livestreamData.data.items[0].status.streamStatus == "inactive") {
 		streamStatusGauge.set(0);
+	} else if (livestreamData.data.items[0].status.streamStatus == "error") {
+		streamStatusGauge.set(1);
+	} else if (livestreamData.data.items[0].status.streamStatus == "created") {
+		streamStatusGauge.set(2);
+	} else if (livestreamData.data.items[0].status.streamStatus == "ready") {
+		streamStatusGauge.set(3);
+	} else if (livestreamData.data.items[0].status.streamStatus == "active") {
+		streamStatusGauge.set(4);
 	}
+
+	// 
 }
 
-app.get("/auth/*", function (req, res) {
+app.get("/auth*", function (req, res) {
 	try {
 		res.send(req.query.code);
 	} catch (err) {
