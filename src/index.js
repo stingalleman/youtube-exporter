@@ -39,15 +39,8 @@ const TOKEN_DIR = "./.credentials/";
 const TOKEN_PATH = TOKEN_DIR + "youtube-creds.json";
 
 function init() {
-	// Load client secrets from a local file.
-	fs.readFile("config.json", function processClientSecrets(err, content) {
-		if (err) {
-			console.log("Error loading client secret file: " + err);
-			return;
-		}
-		// Authorize a client with the loaded credentials, then call the YouTube API.
-		authorize(JSON.parse(content), execute);
-	});
+	// Authorize a client with the loaded credentials, then call the YouTube API.
+	authorize(execute);
 }
 
 init();
@@ -62,7 +55,7 @@ setInterval(function () {
  * @param {Object} credentials The authorization client credentials.
  * @param {function} callback The callback to call with the authorized client.
  */
-function authorize(credentials, callback) {
+function authorize(callback) {
 	const clientSecret = process.env.CLIENTSECRET;
 	const clientId = process.env.CLIENTID;
 	const redirectUrl = process.env.REDIRECTURL;
